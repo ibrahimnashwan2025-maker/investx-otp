@@ -9,6 +9,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "firebase-admin": "^14.4.0",
     "resend": "^6.0.0"
   }
 }
