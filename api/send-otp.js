@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const { Resend } = require("resend");
+const { initializeApp, getApps, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 
 const app = express();
 
@@ -12,7 +14,32 @@ const verifiedStore = new Map();
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// الصفحة الرئيسية
+function getFirebaseAuth() {
+  const apps = getApps();
+
+  if (apps.length === 0) {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+    if (
+      !process.env.FIREBASE_PROJECT_ID ||
+      !process.env.FIREBASE_CLIENT_EMAIL ||
+      !privateKey
+    ) {
+      throw new Error("Firebase environment variables are missing");
+    }
+
+    initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey.replace(/\\n/g, "\n"),
+      }),
+    });
+  }
+
+  return getAuth();
+}
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -20,7 +47,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// إرسال OTP
 app.post("/api/send-otp", async (req, res) => {
   try {
     const email = req.body?.email?.trim().toLowerCase();
@@ -37,7 +63,7 @@ app.post("/api/send-otp", async (req, res) => {
     ).toString();
 
     otpStore.set(email, {
-      otp,
+      otp: otp,
       expiresAt: Date.now() + 5 * 60 * 1000,
     });
 
@@ -51,6 +77,7 @@ app.post("/api/send-otp", async (req, res) => {
         <div style="font-family:Arial;direction:rtl;text-align:center">
           <h2>InvestX 📈</h2>
           <p>رمز التحقق الخاص بك هو:</p>
+
           <div style="
             font-size:32px;
             font-weight:bold;
@@ -59,6 +86,7 @@ app.post("/api/send-otp", async (req, res) => {
           ">
             ${otp}
           </div>
+
           <p>صلاحية الرمز 5 دقائق.</p>
           <p>إذا لم تطلب هذا الرمز، يمكنك تجاهل هذه الرسالة.</p>
         </div>
@@ -79,7 +107,6 @@ app.post("/api/send-otp", async (req, res) => {
   }
 });
 
-// التحقق من OTP
 app.post("/api/verify-otp", (req, res) => {
   try {
     const email = req.body?.email?.trim().toLowerCase();
@@ -137,7 +164,6 @@ app.post("/api/verify-otp", (req, res) => {
   }
 });
 
-// تغيير كلمة المرور
 app.post("/api/reset-password", async (req, res) => {
   try {
     const email = req.body?.email?.trim().toLowerCase();
@@ -175,36 +201,11 @@ app.post("/api/reset-password", async (req, res) => {
       });
     }
 
-    // Firebase Admin يتم تحميله هنا فقط
-    const admin = require("firebase-admin");
+    const auth = getFirebaseAuth();
 
-    if (!admin.apps.length) {
-      const privateKey =
-        process.env.FIREBASE_PRIVATE_KEY;
+    const user = await auth.getUserByEmail(email);
 
-      if (
-        !process.env.FIREBASE_PROJECT_ID ||
-        !process.env.FIREBASE_CLIENT_EMAIL ||
-        !privateKey
-      ) {
-        throw new Error(
-          "Firebase environment variables are missing"
-        );
-      }
-
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: privateKey.replace(/\\n/g, "\n"),
-        }),
-      });
-    }
-
-    const user =
-      await admin.auth().getUserByEmail(email);
-
-    await admin.auth().updateUser(user.uid, {
+    await auth.updateUser(user.uid, {
       password: newPassword,
     });
 
