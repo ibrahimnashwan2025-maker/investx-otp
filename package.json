@@ -1,0 +1,14 @@
+{
+  "name": "investx-otp",
+  "version": "1.0.0",
+  "description": "InvestX email OTP backend",
+  "main": "api/send-otp.js",
+  "scripts": {
+    "start": "node api/send-otp.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "resend": "^6.0.0"
+  }
+}
